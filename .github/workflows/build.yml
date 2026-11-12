@@ -9,10 +9,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Download repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Unpack project ZIP
+        run: |
+          mkdir project
+          unzip -o *.zip -d project
+          find project -name gradlew -exec chmod +x {} \;
+
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -23,11 +29,13 @@ jobs:
 
       - name: Build APK
         run: |
-          chmod +x gradlew
+          cd project
+          GRADLEW=$(find . -name gradlew | head -n 1)
+          cd "$(dirname "$GRADLEW")"
           ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MoiAI-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: project/**/app/build/outputs/apk/debug/app-debug.apk

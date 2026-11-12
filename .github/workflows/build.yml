@@ -23,31 +23,32 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - name: Find ZIP
+      - name: Find and unpack ZIP
         run: |
-          ZIP_FILE=$(find . -type f -iname "*.zip" | head -n 1)
+          mkdir project
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
             echo "ZIP NOT FOUND"
             exit 1
           fi
-          mkdir project
           unzip -o "$ZIP_FILE" -d project
-
-      - name: Diagnose project files
-        run: |
-          echo "FILES IN ARCHIVE:"
-          find project -maxdepth 7 -type f | head -300
-          echo "SEARCHING FOR GRADLE:"
-          find project -type f \( -name gradlew -o -name settings.gradle -o -name settings.gradle.kts -o -name build.gradle -o -name build.gradle.kts \)
 
       - name: Locate Android project
         run: |
-          GRADLEW=$(find project -type f -name gradlew | head -n 1)
-          if [ -z "$GRADLEW" ]; then
-            echo "GRADLE WRAPPER MISSING"
+          SETTINGS=$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)
+          if [ -z "$SETTINGS" ]; then
+            echo "ANDROID PROJECT NOT FOUND"
+            find project -maxdepth 5 -type f | head -100
             exit 1
           fi
-          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> $GITHUB_ENV
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Found project: $PROJECT_DIR"
+
+      - name: Generate Gradle Wrapper
+        run: |
+          cd "$PROJECT_DIR"
+          gradle wrapper --gradle-version 8.9
 
       - name: Build APK
         run: |
@@ -56,8 +57,8 @@ jobs:
           ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: MoiAI-debug-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+
